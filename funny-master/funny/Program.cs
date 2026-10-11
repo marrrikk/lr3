@@ -1,20 +1,26 @@
 using Microsoft.EntityFrameworkCore;
 using funny.Data;
 using funny.Logic;
+using ProxyUsers;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllersWithViews();
 
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(connectionString));
+    options.UseInMemoryDatabase("FunnyDb"));
 
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 builder.Services.AddTransient<IOldSexLogic, OldSexLogic>();
+
+builder.Services.AddHttpClient<IUserProxy, UserProxy>(client =>
+    client.BaseAddress = new Uri(builder.Configuration["UserServiceUrl"] ?? "http://localhost:8000/"));
+builder.Services.AddSingleton<ClientService>(provider => new ClientService(
+    provider.GetRequiredService<IUserProxy>(),
+    new HttpClient { BaseAddress = new Uri(builder.Configuration["PassportServiceUrl"] ?? "http://localhost:8008/") }));
 
 var app = builder.Build();
 
@@ -30,7 +36,6 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
-app.UseHttpsRedirection();
 app.UseStaticFiles();
 
 app.UseRouting();
@@ -48,18 +53,17 @@ using (var scope = app.Services.CreateScope())
     {
         var context = services.GetRequiredService<AppDbContext>();
 
-        context.Database.EnsureDeleted();
         context.Database.EnsureCreated();
 
         if (!context.DigitalServices.Any())
         {
             var defaultServices = new[]
             {
-                new funny.Models.DigitalService { Name = "Разработка Landing Page", Description = "Быстрый одностраничный сайт для конверсии", Price = 15000 },
-                new funny.Models.DigitalService { Name = "Разработка Корпоративного сайта", Description = "Многостраничный сайт для вашей компании с админкой", Price = 45000 },
-                new funny.Models.DigitalService { Name = "Настройка Яндекс.Директ", Description = "Контекстная реклама с гарантией целевых лидов", Price = 10000 },
-                new funny.Models.DigitalService { Name = "SEO Оптимизация", Description = "Вывод вашего сайта в топ-10 поисковых систем", Price = 20000 },
-                new funny.Models.DigitalService { Name = "Техническая поддержка 24/7", Description = "Мониторинг серверов и оперативное исправление багов", Price = 8000 }
+                new funny.Models.DigitalService { Name = "Р Р°Р·СЂР°Р±РѕС‚РєР° Landing Page", Description = "Р РµРєР»Р°РјРЅР°СЏ СЃС‚СЂР°РЅРёС†Р° РґР»СЏ РєРѕРјРїР°РЅРёРё", Price = 15000 },
+                new funny.Models.DigitalService { Name = "Р Р°Р·СЂР°Р±РѕС‚РєР° СЃР°Р№С‚Р°", Description = "РЎР°Р№С‚ РґР»СЏ РІР°С€РµРіРѕ Р±РёР·РЅРµСЃР°", Price = 45000 },
+                new funny.Models.DigitalService { Name = "РќР°СЃС‚СЂРѕР№РєР° 1РЎ", Description = "РЈСЃС‚Р°РЅРѕРІРєР° Рё РЅР°СЃС‚СЂРѕР№РєР° 1РЎ", Price = 10000 },
+                new funny.Models.DigitalService { Name = "SEO РїСЂРѕРґРІРёР¶РµРЅРёРµ", Description = "РџСЂРѕРґРІРёР¶РµРЅРёРµ СЃР°Р№С‚Р° РІ РїРѕРёСЃРєРµ", Price = 20000 },
+                new funny.Models.DigitalService { Name = "РўРµС…РЅРёС‡РµСЃРєР°СЏ РїРѕРґРґРµСЂР¶РєР°", Description = "РџРѕРјРѕС‰СЊ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏРј", Price = 8000 }
             };
 
             context.DigitalServices.AddRange(defaultServices);
@@ -69,7 +73,7 @@ using (var scope = app.Services.CreateScope())
     catch (Exception ex)
     {
         var logger = services.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "Ошибка при автоматическом создании или заполнении БД.");
+        logger.LogError(ex, "РћС€РёР±РєР° РїСЂРё Р·Р°РїРѕР»РЅРµРЅРёРё СЃРїРёСЃРєР° СѓСЃР»СѓРі.");
     }
 }
 

@@ -1,6 +1,6 @@
-﻿namespace funny.Models
+namespace funny.Models
 {
-    public class ConnectDialogPizzaVM
+    public class ConnectDialogPizzaVM : ClientRequest
     {
         public long Id { get; set; }
         public string? Size { get; set; }

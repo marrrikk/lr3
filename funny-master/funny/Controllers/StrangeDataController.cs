@@ -1,4 +1,5 @@
-﻿using funny.Data;
+using funny.Data;
+using funny.Logic;
 using funny.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -9,6 +10,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text;
+using System.Net;
 using System.Threading.Tasks;
 
 namespace funny.Controllers
@@ -24,15 +26,17 @@ namespace funny.Controllers
 
         private readonly ILogger<StrangeDataController> _logger;
         private readonly AppDbContext _context;
+        private readonly ClientService _clients;
 
-        public StrangeDataController(ILogger<StrangeDataController> logger, AppDbContext context)
+        public StrangeDataController(ILogger<StrangeDataController> logger, AppDbContext context, ClientService clients)
         {
             _logger = logger;
             _context = context;
+            _clients = clients;
         }
 
         [HttpPost("SendCola")]
-        public IActionResult SendCola([FromBody] ConnectDialogColaVM colaVM)
+        public async Task<IActionResult> SendCola([FromBody] ConnectDialogColaVM colaVM)
         {
             if (colaVM == null)
                 return BadRequest("Данные заказа не могут быть пустыми.");
@@ -40,6 +44,17 @@ namespace funny.Controllers
             _logger.LogInformation("Получен заказ колы. Вкус: {Tasty}, Объем: {Volume}, Имя: {Name}, Телефон: {Phone}",
                 colaVM.Tasty, colaVM.Volume, colaVM.Name, colaVM.Phone);
 
+            try
+            {
+                if (!await _clients.Send(colaVM)) return StatusCode(403, "Вы не обслуживаетесь.");
+            }
+            catch (HttpRequestException)
+            {
+                return StatusCode(503, "Сервис пользователей или паспортов недоступен.");
+            }
+
+            colaVM.SerialNumber = null;
+            colaVM.Number = null;
             colaVM.Id = _ColaCurrentId++;
             _ColaOrdersDbInMemory.Add(colaVM);
 
@@ -87,7 +102,7 @@ namespace funny.Controllers
         }
 
         [HttpPost("SendPizza")]
-        public IActionResult SendPizza([FromBody] ConnectDialogPizzaVM pizzaVM)
+        public async Task<IActionResult> SendPizza([FromBody] ConnectDialogPizzaVM pizzaVM)
         {
             if (pizzaVM == null)
                 return BadRequest("Данные заказа не могут быть пустыми.");
@@ -95,6 +110,17 @@ namespace funny.Controllers
             _logger.LogInformation("Получен заказ пиццы. Размер: {Size}, Опции: {Options}, Толщина: {Thickness}",
                 pizzaVM.Size, pizzaVM.Options, pizzaVM.Thickness);
 
+            try
+            {
+                if (!await _clients.Send(pizzaVM)) return StatusCode(403, "Вы не обслуживаетесь.");
+            }
+            catch (HttpRequestException)
+            {
+                return StatusCode(503, "Сервис пользователей или паспортов недоступен.");
+            }
+
+            pizzaVM.SerialNumber = null;
+            pizzaVM.Number = null;
             pizzaVM.Id = _PizzaCurrentId++;
             _PizzaOrdersDbInMemory.Add(pizzaVM);
 
@@ -199,9 +225,9 @@ namespace funny.Controllers
 
                 if (!string.IsNullOrWhiteSpace(request.Filter))
                 {
-                    string filterPattern = $"%{request.Filter.Trim()}%";
-                    query = query.Where(s => EF.Functions.Like(s.Name, filterPattern)
-                                          || EF.Functions.Like(s.Description, filterPattern));
+                    string filter = request.Filter.Trim();
+                    query = query.Where(s => s.Name.Contains(filter)
+                                          || s.Description.Contains(filter));
                 }
 
                 query = request.Sorted?.ToLower() switch
@@ -225,8 +251,8 @@ namespace funny.Controllers
                     foreach (var service in services)
                     {
                         htmlBuilder.Append($"<li class='service-item' data-id='{service.Id}'>");
-                        htmlBuilder.Append($"  <h3 class='service-name'>{service.Name}</h3>");
-                        htmlBuilder.Append($"  <p class='service-description'>{service.Description}</p>");
+                        htmlBuilder.Append($"  <h3 class='service-name'>{WebUtility.HtmlEncode(service.Name)}</h3>");
+                        htmlBuilder.Append($"  <p class='service-description'>{WebUtility.HtmlEncode(service.Description)}</p>");
                         htmlBuilder.Append($"  <span class='service-price'>Цена: {service.Price.ToString("F2", CultureInfo.InvariantCulture)} руб.</span>");
                         htmlBuilder.Append("</li>");
                     }
